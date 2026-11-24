@@ -1,7 +1,6 @@
 import { HalfFloatType, ShaderMaterial, WebGLRenderTarget, type PerspectiveCamera, type Texture, type WebGLRenderer } from 'three';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
-import { HorizontalBlurShader } from 'three/examples/jsm/shaders/HorizontalBlurShader.js';
-import { VerticalBlurShader } from 'three/examples/jsm/shaders/VerticalBlurShader.js';
+import { HalfResBlur } from './HalfResBlur';
 import { FULLSCREEN_VERTEX, VIEW_RAY_GLSL, updateViewRayUniforms, viewRayUniforms } from '../waterGlsl';
 import type { WaterLook } from '../../world/environment';
 
@@ -62,16 +61,12 @@ void main() {
 
 /** Volumetric light shafts, ray-marched at half resolution and blurred to hide the sampling noise. */
 export class ShaftsPass {
-  readonly target: WebGLRenderTarget;
-  private readonly temp: WebGLRenderTarget;
+  private readonly raw = new WebGLRenderTarget(1, 1, { type: HalfFloatType, depthBuffer: false });
+  private readonly blur = new HalfResBlur();
   private readonly material: ShaderMaterial;
-  private readonly blurH = new ShaderMaterial({ ...HorizontalBlurShader, uniforms: { tDiffuse: { value: null }, h: { value: 0 } } });
-  private readonly blurV = new ShaderMaterial({ ...VerticalBlurShader, uniforms: { tDiffuse: { value: null }, v: { value: 0 } } });
-  private readonly quad = new FullScreenQuad();
+  private readonly quad: FullScreenQuad;
 
   constructor(look: WaterLook, steps: number) {
-    this.target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, depthBuffer: false });
-    this.temp = this.target.clone();
     this.material = new ShaderMaterial({
       defines: { SHAFT_STEPS: steps },
       uniforms: {
@@ -90,15 +85,17 @@ export class ShaftsPass {
       depthTest: false,
       depthWrite: false,
     });
+    this.quad = new FullScreenQuad(this.material);
+  }
+
+  /** Blurred shafts, half resolution. */
+  get target(): WebGLRenderTarget {
+    return this.blur.target;
   }
 
   setSize(width: number, height: number): void {
-    const w = Math.max(1, Math.round(width / 2));
-    const h = Math.max(1, Math.round(height / 2));
-    this.target.setSize(w, h);
-    this.temp.setSize(w, h);
-    this.blurH.uniforms.h.value = 1 / w;
-    this.blurV.uniforms.v.value = 1 / h;
+    this.raw.setSize(Math.max(1, Math.round(width / 2)), Math.max(1, Math.round(height / 2)));
+    this.blur.setSize(width, height);
   }
 
   render(renderer: WebGLRenderer, camera: PerspectiveCamera, depth: Texture, caustics: Texture, time: number, frame: number): void {
@@ -108,18 +105,8 @@ export class ShaftsPass {
     u.uTime.value = time;
     u.uFrame.value = frame % 64;
 
-    this.quad.material = this.material;
-    renderer.setRenderTarget(this.target);
+    renderer.setRenderTarget(this.raw);
     this.quad.render(renderer);
-
-    this.blurH.uniforms.tDiffuse.value = this.target.texture;
-    this.quad.material = this.blurH;
-    renderer.setRenderTarget(this.temp);
-    this.quad.render(renderer);
-
-    this.blurV.uniforms.tDiffuse.value = this.temp.texture;
-    this.quad.material = this.blurV;
-    renderer.setRenderTarget(this.target);
-    this.quad.render(renderer);
+    this.blur.render(renderer, this.raw.texture);
   }
 }

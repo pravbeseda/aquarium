@@ -3,6 +3,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { WaterPass } from './passes/WaterPass';
 import { ShaftsPass } from './passes/ShaftsPass';
 import { FinalPass } from './passes/FinalPass';
+import { HalfResBlur } from './passes/HalfResBlur';
 import type { CausticsMap } from './CausticsMap';
 import type { WaterLook } from '../world/environment';
 
@@ -12,14 +13,15 @@ export interface PipelineOptions {
   shaftSteps: number;
 }
 
-/** Scene → water (fog, shafts, glass, room) → bloom → lens + tone mapping → screen. */
+/** Scene → shafts → water (fog, glass, room) → bloom → distance blur, lens and tone mapping → screen. */
 export class RenderPipeline {
   private readonly sceneTarget: WebGLRenderTarget;
   private readonly waterTarget: WebGLRenderTarget;
   private readonly waterPass: WaterPass;
   private readonly shaftsPass: ShaftsPass;
   private readonly bloom: UnrealBloomPass | null;
-  private readonly finalPass = new FinalPass();
+  private readonly finalPass: FinalPass;
+  private readonly distanceBlur = new HalfResBlur(1.6);
   private readonly look: WaterLook;
   private frame = 0;
 
@@ -35,6 +37,7 @@ export class RenderPipeline {
     this.waterTarget = new WebGLRenderTarget(1, 1, { type: HalfFloatType, depthBuffer: false });
     this.waterPass = new WaterPass(look);
     this.shaftsPass = new ShaftsPass(look, opts.shaftSteps);
+    this.finalPass = new FinalPass(look);
     this.bloom = opts.bloom ? new UnrealBloomPass(new Vector2(1, 1), 0.25, 0.5, 1.6) : null;
   }
 
@@ -42,6 +45,7 @@ export class RenderPipeline {
     this.sceneTarget.setSize(width, height);
     this.waterTarget.setSize(width, height);
     this.shaftsPass.setSize(width, height);
+    this.distanceBlur.setSize(width, height);
     this.bloom?.setSize(width, height);
   }
 
@@ -64,6 +68,7 @@ export class RenderPipeline {
     );
 
     this.bloom?.render(renderer, this.waterTarget, this.waterTarget, dt, false);
-    this.finalPass.render(renderer, this.waterTarget.texture, time);
+    this.distanceBlur.render(renderer, this.waterTarget.texture);
+    this.finalPass.render(renderer, camera, this.waterTarget.texture, this.distanceBlur.target.texture, depth, time);
   }
 }

@@ -25,6 +25,8 @@ export interface WaterLook {
   roomBlur: number;
   /** Relative index used at the glass; below water's 1.333 to widen the view out of the tank. */
   glassEta: number;
+  /** Distance blur: sharp up to the first distance (m), softest from the second, with this much blur. */
+  distanceBlur: [number, number, number];
   /** Where the air stone sits on the floor (x, z). */
   aerator: Vector2;
   /** Ripples on the surface above the bubble column: x, z and height in metres. */
@@ -57,6 +59,7 @@ export function createWaterLook(): WaterLook {
     roomRotation: new Matrix3().set(Math.cos(roomYaw), 0, Math.sin(roomYaw), 0, 1, 0, -Math.sin(roomYaw), 0, Math.cos(roomYaw)),
     roomBlur: 0.15,
     glassEta: 1.07,
+    distanceBlur: [0.15, 1.1, 0.85],
     aerator,
     surfaceAgitation: new Vector3(aerator.x, aerator.y, 0.0016),
     lamp: {

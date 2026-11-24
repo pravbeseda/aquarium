@@ -1,15 +1,19 @@
-import { ShaderMaterial, type Texture, type WebGLRenderer } from 'three';
+import { ShaderMaterial, Vector3, type PerspectiveCamera, type Texture, type WebGLRenderer } from 'three';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
-import { FULLSCREEN_VERTEX } from '../waterGlsl';
+import { FULLSCREEN_VERTEX, VIEW_RAY_GLSL, updateViewRayUniforms, viewRayUniforms } from '../waterGlsl';
+import type { WaterLook } from '../../world/environment';
 
-// Lens imperfections, tone mapping and output encoding.
+// Distance blur, lens imperfections, tone mapping and output encoding.
 const fragmentShader = /* glsl */ `
 uniform sampler2D tColor;
+uniform sampler2D tBlurred;
+uniform vec3 uDistanceBlur;
 uniform float uAberration;
 uniform float uVignette;
 uniform float uTime;
 varying vec2 vUv;
 
+${VIEW_RAY_GLSL}
 #include <tonemapping_pars_fragment>
 
 float hash( vec2 p ) {
@@ -25,6 +29,12 @@ void main() {
     texture2D( tColor, vUv ).g,
     texture2D( tColor, vUv + offset ).b
   );
+  // Light scattered on its way through the water softens distant things (uDistanceBlur: start, end, strength).
+  float depth = texture2D( tDepth, vUv ).r;
+  vec3 normal;
+  float dist = depth >= 0.99999 ? exitWater( viewRay( vUv ), normal ) : length( viewPosition( vUv, depth ) );
+  float soften = smoothstep( uDistanceBlur.x, uDistanceBlur.y, dist ) * uDistanceBlur.z;
+  color = mix( color, texture2D( tBlurred, vUv ).rgb, soften );
   color *= 1.0 - uVignette * smoothstep( 0.05, 0.55, r2 );
   color = ACESFilmicToneMapping( color );
   color = sRGBTransferOETF( vec4( color, 1.0 ) ).rgb;
@@ -37,10 +47,13 @@ export class FinalPass {
   private readonly material: ShaderMaterial;
   private readonly quad: FullScreenQuad;
 
-  constructor() {
+  constructor(look: WaterLook) {
     this.material = new ShaderMaterial({
       uniforms: {
+        ...viewRayUniforms(look),
         tColor: { value: null },
+        tBlurred: { value: null },
+        uDistanceBlur: { value: new Vector3(...look.distanceBlur) },
         toneMappingExposure: { value: 1 },
         uAberration: { value: 0.012 },
         uVignette: { value: 0.45 },
@@ -55,9 +68,11 @@ export class FinalPass {
     this.quad = new FullScreenQuad(this.material);
   }
 
-  render(renderer: WebGLRenderer, input: Texture, time: number): void {
+  render(renderer: WebGLRenderer, camera: PerspectiveCamera, input: Texture, blurred: Texture, depth: Texture, time: number): void {
     const u = this.material.uniforms;
+    updateViewRayUniforms(u, camera, depth);
     u.tColor.value = input;
+    u.tBlurred.value = blurred;
     u.toneMappingExposure.value = renderer.toneMappingExposure;
     u.uTime.value = time;
     renderer.setRenderTarget(null);
