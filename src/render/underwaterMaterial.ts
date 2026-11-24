@@ -1,4 +1,4 @@
-import { MeshDepthMaterial, ShaderChunk, Vector3, type Material, type Texture, type WebGLProgramParametersWithUniforms } from 'three';
+import { MeshDepthMaterial, ShaderChunk, Vector3, Vector4, type Material, type Texture, type WebGLProgramParametersWithUniforms } from 'three';
 import { insertAfter, insertBefore, replaceInclude } from './shaderPatch';
 
 /** Uniforms shared by every underwater material; updating a value here updates all of them. */
@@ -13,8 +13,11 @@ export interface UnderwaterUniforms {
   uExtinction: { value: Vector3 };
   uTime: { value: number };
   uCurrentDir: { value: Vector3 };
-  uPlayerPos: { value: Vector3 };
+  /** Recent player positions (xyz) with how hard each still pushes plants aside (w), newest first. */
+  uPlayerTrail: { value: Vector4[] };
 }
+
+export const PLAYER_TRAIL_LENGTH = 4;
 
 export function createUnderwaterUniforms(waterLevel: number, extinction: Vector3, lightDir: Vector3): UnderwaterUniforms {
   return {
@@ -26,7 +29,7 @@ export function createUnderwaterUniforms(waterLevel: number, extinction: Vector3
     uExtinction: { value: extinction.clone() },
     uTime: { value: 0 },
     uCurrentDir: { value: new Vector3(1, 0, 0.35).normalize() },
-    uPlayerPos: { value: new Vector3(0, -10, 0) },
+    uPlayerTrail: { value: Array.from({ length: PLAYER_TRAIL_LENGTH }, () => new Vector4(0, -10, 0, 0)) },
   };
 }
 
@@ -52,11 +55,12 @@ export interface UnderwaterOptions {
 const SWAY_PARS = /* glsl */ `
 uniform float uTime;
 uniform vec3 uCurrentDir;
-uniform vec3 uPlayerPos;
+uniform vec4 uPlayerTrail[ ${PLAYER_TRAIL_LENGTH} ];
 uniform float uSwayAmp;
 `;
 
 // Bends an instanced plant in world space, then maps the offset back to local space.
+// The current sways the upper part; the player's recent path parts the plant from lower down.
 // Instances are only rotated about Y and scaled uniformly, so transpose(M) / s^2 inverts M.
 const SWAY_VERTEX = /* glsl */ `
 #ifdef USE_INSTANCING
@@ -71,12 +75,16 @@ const SWAY_VERTEX = /* glsl */ `
   vec3 side = normalize( cross( uCurrentDir, vec3( 0.0, 1.0, 0.0 ) ) );
   vec3 offs = uCurrentDir * ( 0.45 + 0.55 * sin( uTime * 0.83 + ph - h * 1.9 ) ) * gust
             + side * 0.35 * sin( uTime * 1.37 + ph * 1.3 - h * 2.6 );
-  offs *= uSwayAmp;
-  vec3 away = wp - uPlayerPos;
-  float worldHeight = sqrt( sc2 );
-  float push = 1.0 - smoothstep( 0.012, 0.075, length( away ) );
-  offs += normalize( vec3( away.x, 0.0, away.z ) + 1e-5 ) * push * min( 0.05, worldHeight * 0.7 );
-  offs *= h * h;
+  offs *= uSwayAmp * h * h;
+  vec3 push = vec3( 0.0 );
+  for ( int k = 0; k < ${PLAYER_TRAIL_LENGTH}; k++ ) {
+    vec3 away = wp - uPlayerTrail[ k ].xyz;
+    away.y *= 0.5;
+    float w = ( 1.0 - smoothstep( 0.015, 0.1, length( away ) ) ) * uPlayerTrail[ k ].w;
+    push += normalize( vec3( away.x, 0.0, away.z ) + 1e-5 ) * w;
+  }
+  push /= max( 1.0, length( push ) );
+  offs += push * min( 0.08, sqrt( sc2 ) * 0.85 ) * pow( h, 1.3 );
   offs.y -= length( offs.xz ) * 0.4 * h;
   transformed += ( transpose( im ) * offs ) / sc2;
 }

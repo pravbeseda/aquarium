@@ -1,4 +1,4 @@
-import { Matrix4, ShaderMaterial, type DepthTexture, type PerspectiveCamera, type Texture, type WebGLRenderer, type WebGLRenderTarget } from 'three';
+import { Matrix4, ShaderMaterial, Vector2, type DepthTexture, type PerspectiveCamera, type Texture, type WebGLRenderer, type WebGLRenderTarget } from 'three';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { ROOM_PARS } from '../roomGlsl';
 import { FULLSCREEN_VERTEX, VIEW_RAY_GLSL, updateViewRayUniforms, viewRayUniforms } from '../waterGlsl';
@@ -14,7 +14,9 @@ uniform vec3 uWaterDeep;
 uniform vec3 uWaterShallow;
 uniform vec3 uLightDirW;
 uniform float uRoomLod;
+uniform float uGlassEta;
 uniform float uTime;
+uniform vec2 uTexel;
 varying vec2 vUv;
 
 ${VIEW_RAY_GLSL}
@@ -50,8 +52,8 @@ float behindScene( vec3 x, vec2 uv ) {
 vec3 traceReflection( vec3 origin, vec3 dir ) {
   vec3 fallback = waterColor( dir, origin.y );
   float prev = 0.0;
-  float s = 0.01;
-  for ( int i = 0; i < 18; i++ ) {
+  float s = 0.005;
+  for ( int i = 0; i < 26; i++ ) {
     vec2 uv = projectToScreen( origin + dir * s );
     if ( uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0 ) break;
     float behind = behindScene( origin + dir * s, uv );
@@ -59,7 +61,7 @@ vec3 traceReflection( vec3 origin, vec3 dir ) {
       // Refine between the last point in front and this one.
       float lo = prev;
       float hi = s;
-      for ( int j = 0; j < 5; j++ ) {
+      for ( int j = 0; j < 6; j++ ) {
         float mid = 0.5 * ( lo + hi );
         vec2 muv = projectToScreen( origin + dir * mid );
         if ( behindScene( origin + dir * mid, muv ) > 0.0 ) hi = mid; else lo = mid;
@@ -70,23 +72,32 @@ vec3 traceReflection( vec3 origin, vec3 dir ) {
       float confidence = ( 1.0 - smoothstep( 0.004, 0.02 + hi * 0.03, thickness ) );
       vec2 edge = min( huv, 1.0 - huv );
       confidence *= smoothstep( 0.0, 0.08, min( edge.x, edge.y ) );
-      vec3 c = throughWater( texture2D( tColor, huv ).rgb, hi, dir, hit.y );
+      // A small tap cross hides the stair-stepping of hits that land on alternate pixels.
+      vec3 hitColor = 0.25 * (
+        texture2D( tColor, huv + vec2( uTexel.x, 0.0 ) ).rgb + texture2D( tColor, huv - vec2( uTexel.x, 0.0 ) ).rgb +
+        texture2D( tColor, huv + vec2( 0.0, uTexel.y ) ).rgb + texture2D( tColor, huv - vec2( 0.0, uTexel.y ) ).rgb );
+      vec3 c = throughWater( hitColor, hi, dir, hit.y );
       return mix( fallback, c, confidence );
     }
     prev = s;
-    s *= 1.28;
+    s *= 1.2;
   }
   return fallback;
 }
 
 // What is seen where a ray leaves through the glass: the room (refracted) or a mirror image (TIR).
+// The glass uses a softer index than water so the view out is wider than physical Snell's window;
+// the mirror then only appears when looking along the pane.
 vec3 glass( vec3 p, vec3 dir, vec3 n ) {
   float cosI = dot( dir, n );
-  float F = min( waterToAirFresnel( cosI ) + 0.03, 1.0 );
+  float cosCritical = sqrt( 1.0 - 1.0 / ( uGlassEta * uGlassEta ) );
+  float F = min( fresnelOut( cosI, uGlassEta ) + 0.03, 1.0 );
+  F = mix( F, 1.0, smoothstep( cosCritical + 0.12, cosCritical, cosI ) );
   vec3 color = vec3( 0.0 );
   if ( F < 1.0 ) {
-    vec3 refracted = refract( dir, -n, 1.333 );
-    color = sampleRoom( p, refracted, uRoomLod ) * ( 1.0 - F );
+    vec3 refracted = refract( dir, -n, uGlassEta );
+    // Float glass is faintly green, which is most of what tells the eye there is a pane at all.
+    color = sampleRoom( p, refracted, uRoomLod ) * vec3( 0.88, 0.96, 0.93 ) * ( 1.0 - F );
   }
   color += traceReflection( p, reflect( dir, n ) ) * F;
 
@@ -116,7 +127,10 @@ void main() {
   if ( depth >= 0.99999 ) {
     vec3 n;
     dist = exitWater( dir, n );
-    color = glass( uCamPos + dir * dist, dir, n );
+    vec3 behind = throughWater( glass( uCamPos + dir * dist, dir, n ), dist, dir, uCamPos.y );
+    // Nothing opaque here, but transparent things (fins, bubbles, motes) may have been blended over
+    // the alpha-0 clear: alpha is their coverage and rgb their premultiplied colour.
+    color = behind * ( 1.0 - src.a ) + src.rgb;
   } else {
     dist = length( viewPosition( vUv, depth ) );
     color = src.rgb;
@@ -128,9 +142,9 @@ void main() {
       vec3 n = normalize( vec3( w.x * 0.03, -1.0, w.y * 0.03 ) );
       color += traceReflection( p, reflect( dir, n ) ) * mirror;
     }
+    color = throughWater( color, dist, dir, uCamPos.y );
   }
 
-  color = throughWater( color, dist, dir, uCamPos.y );
   color += texture2D( tShafts, vUv ).rgb;
   gl_FragColor = vec4( color, 1.0 );
 }
@@ -168,7 +182,9 @@ export class WaterPass {
         uRoomRadius: { value: look.roomRadius },
         uRoomIntensity: { value: look.roomIntensity },
         uRoomLod: { value: 0 },
+        uGlassEta: { value: look.glassEta },
         uTime: { value: 0 },
+        uTexel: { value: new Vector2() },
       },
       vertexShader: FULLSCREEN_VERTEX,
       fragmentShader,
@@ -187,6 +203,7 @@ export class WaterPass {
     u.uRoomLod.value = inputs.roomMaxLod * roomBlur;
     u.uViewProj.value.copy(this.viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     u.uTime.value = time;
+    u.uTexel.value.set(1.5 / target.width, 1.5 / target.height);
 
     renderer.setRenderTarget(target);
     this.quad.render(renderer);

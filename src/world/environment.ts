@@ -23,6 +23,8 @@ export interface WaterLook {
   roomRotation: Matrix3;
   /** Fraction of the room cube map's mip chain used to blur the room seen through the front and side glass. */
   roomBlur: number;
+  /** Relative index used at the glass; below water's 1.333 to widen the view out of the tank. */
+  glassEta: number;
   /** Pendant LED lamp above the open-top tank, seen through the surface. */
   lamp: { center: Vector3; halfSize: [number, number]; radiance: Vector3 };
 }
@@ -48,7 +50,8 @@ export function createWaterLook(): WaterLook {
     roomIntensity: 0.32,
     roomYaw,
     roomRotation: new Matrix3().set(Math.cos(roomYaw), 0, Math.sin(roomYaw), 0, 1, 0, -Math.sin(roomYaw), 0, Math.cos(roomYaw)),
-    roomBlur: 0.26,
+    roomBlur: 0.15,
+    glassEta: 1.07,
     lamp: {
       center: new Vector3(0, TANK.waterLevel + 0.32, 0),
       halfSize: [0.5, 0.09],

@@ -19,7 +19,7 @@ A browser game: first-person life of a small fish in a planted aquarium. Vite + 
 ## Conventions
 
 - World units are metres; the tank interior is `TANK` in `src/sim/tank.ts`, Y up, front glass at +Z.
-- The water surface writes its mirror reflectance into the alpha channel of the scene target; additive effects must use `ADDITIVE_KEEP_ALPHA` so they do not overwrite it.
+- The scene target's alpha carries two signals for `WaterPass`: where depth hits geometry, the water surface's mirror reflectance (`1 - 0.5 F`); where only glass is behind (clear alpha 0), the coverage of transparent objects in front of it. Additive effects must use `ADDITIVE_KEEP_ALPHA` so they do not overwrite either.
 - Randomness that shapes the scene is seeded (`mulberry32`) so every load looks the same.
 
 ## Debug URL parameters

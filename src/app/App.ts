@@ -58,7 +58,8 @@ export class App {
 
     this.hud = new Hud(root, this.touch);
     this.renderer = new WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
-    this.renderer.setClearColor(0x000000, 1);
+    // Alpha 0 marks "no opaque surface"; the water pass reads transparent coverage over the glass from it.
+    this.renderer.setClearColor(0x000000, 0);
     this.renderer.shadowMap.enabled = true;
     this.renderer.toneMappingExposure = 1.05;
     root.prepend(this.renderer.domElement);

@@ -13,18 +13,24 @@ export interface FishProfile {
   stations: ReadonlyArray<{ s: number; halfHeight: number; halfWidth: number; centreY: number }>;
 }
 
+function catmullRom(p0: number, p1: number, p2: number, p3: number, t: number): number {
+  return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
+}
+
+/** Smooth (Catmull-Rom) interpolation through the profile stations, so the silhouette has no kinks. */
 function sampleProfile(p: FishProfile, s: number) {
   const st = p.stations;
   let i = 0;
   while (i < st.length - 2 && st[i + 1].s < s) i++;
-  const a = st[i];
-  const b = st[i + 1];
-  const t = Math.min(1, Math.max(0, (s - a.s) / (b.s - a.s)));
-  const k = t * t * (3 - 2 * t);
+  const a = st[Math.max(0, i - 1)];
+  const b = st[i];
+  const c = st[i + 1];
+  const d = st[Math.min(st.length - 1, i + 2)];
+  const t = Math.min(1, Math.max(0, (s - b.s) / (c.s - b.s)));
   return {
-    hh: a.halfHeight + (b.halfHeight - a.halfHeight) * k,
-    hw: a.halfWidth + (b.halfWidth - a.halfWidth) * k,
-    cy: a.centreY + (b.centreY - a.centreY) * k,
+    hh: Math.max(0.002, catmullRom(a.halfHeight, b.halfHeight, c.halfHeight, d.halfHeight, t)),
+    hw: Math.max(0.002, catmullRom(a.halfWidth, b.halfWidth, c.halfWidth, d.halfWidth, t)),
+    cy: catmullRom(a.centreY, b.centreY, c.centreY, d.centreY, t),
   };
 }
 
@@ -60,17 +66,30 @@ export function fishBody(profile: FishProfile, rings = 36, segments = 22): Buffe
   return g;
 }
 
-/** A flat fin from an outline in the (z, y) plane, placed at lateral offset x and optionally tilted outwards. */
-export function fin(outline: ReadonlyArray<[number, number]>, x = 0, tilt = 0): BufferGeometry {
-  const shape = new Shape(outline.map(([z, y]) => new Vector2(z, y)));
-  const g = new ShapeGeometry(shape, 6);
+/**
+ * A flat fin from an outline in the (z, y) plane, placed at lateral offset x and optionally tilted outwards.
+ * The outline runs from the front of the fin base around the free edge to the back of the base;
+ * with `smooth` the free edge is a spline through the points and the base stays straight.
+ */
+export function fin(outline: ReadonlyArray<[number, number]>, x = 0, tilt = 0, smooth = false): BufferGeometry {
+  const points = outline.map(([z, y]) => new Vector2(z, y));
+  let shape: Shape;
+  if (smooth) {
+    shape = new Shape();
+    shape.moveTo(points[0].x, points[0].y);
+    shape.splineThru(points.slice(1));
+    shape.lineTo(points[0].x, points[0].y);
+  } else {
+    shape = new Shape(points);
+  }
+  const g = new ShapeGeometry(shape, 24);
   const pos = g.attributes.position;
   const uv = g.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
     const z = pos.getX(i);
     const y = pos.getY(i);
     pos.setXYZ(i, x + Math.sin(tilt) * Math.abs(y), y * Math.cos(tilt), z);
-    uv.setXY(i, 0.5 - z, 0.5 + y);
+    uv.setXY(i, 0.5 - z, 0.5 + y * 0.6);
   }
   g.computeVertexNormals();
   return g;
@@ -113,25 +132,32 @@ export function neonFins(): BufferGeometry {
 export const ANGEL_PROFILE: FishProfile = {
   bodyLength: 0.78,
   stations: [
-    { s: 0, halfHeight: 0.01, halfWidth: 0.005, centreY: 0.02 },
-    { s: 0.07, halfHeight: 0.1, halfWidth: 0.03, centreY: 0.03 },
-    { s: 0.2, halfHeight: 0.22, halfWidth: 0.042, centreY: 0.02 },
-    { s: 0.4, halfHeight: 0.3, halfWidth: 0.045, centreY: 0.0 },
-    { s: 0.58, halfHeight: 0.27, halfWidth: 0.036, centreY: 0.0 },
-    { s: 0.76, halfHeight: 0.15, halfWidth: 0.022, centreY: 0.0 },
-    { s: 0.9, halfHeight: 0.08, halfWidth: 0.013, centreY: 0.0 },
-    { s: 1, halfHeight: 0.085, halfWidth: 0.008, centreY: 0.0 },
+    { s: 0, halfHeight: 0.012, halfWidth: 0.008, centreY: 0.03 },
+    { s: 0.05, halfHeight: 0.07, halfWidth: 0.022, centreY: 0.04 },
+    { s: 0.12, halfHeight: 0.16, halfWidth: 0.034, centreY: 0.035 },
+    { s: 0.25, halfHeight: 0.26, halfWidth: 0.042, centreY: 0.02 },
+    { s: 0.4, halfHeight: 0.3, halfWidth: 0.044, centreY: 0.0 },
+    { s: 0.55, halfHeight: 0.27, halfWidth: 0.038, centreY: -0.005 },
+    { s: 0.7, halfHeight: 0.18, halfWidth: 0.027, centreY: 0.0 },
+    { s: 0.85, halfHeight: 0.095, halfWidth: 0.016, centreY: 0.0 },
+    { s: 0.95, halfHeight: 0.065, halfWidth: 0.01, centreY: 0.0 },
+    { s: 1, halfHeight: 0.07, halfWidth: 0.007, centreY: 0.0 },
   ],
 };
 
 export function angelFins(): BufferGeometry {
+  const smooth = true;
   return fins([
-    fin([[-0.27, 0.07], [-0.36, 0.2], [-0.5, 0.24], [-0.46, 0.0], [-0.5, -0.24], [-0.36, -0.2], [-0.27, -0.07]]), // caudal
-    fin([[0.2, 0.26], [0.0, 0.48], [-0.22, 0.72], [-0.3, 0.68], [-0.22, 0.3], [-0.12, 0.2]]), // dorsal sail
-    fin([[0.15, -0.27], [-0.02, -0.5], [-0.22, -0.74], [-0.3, -0.7], [-0.22, -0.3], [-0.12, -0.2]]), // anal sail
-    fin([[0.2, -0.2], [0.05, -0.62], [0.02, -0.64], [0.14, -0.2]], 0.02, 0.15), // ventral filaments
-    fin([[0.2, -0.2], [0.05, -0.62], [0.02, -0.64], [0.14, -0.2]], -0.02, -0.15),
-    fin([[0.28, 0.0], [0.18, -0.06], [0.14, -0.02], [0.2, 0.02]], 0.06, 0.6), // pectorals
-    fin([[0.28, 0.0], [0.18, -0.06], [0.14, -0.02], [0.2, 0.02]], -0.06, -0.6),
+    // Caudal fan with trailing upper and lower filaments.
+    fin([[-0.27, 0.07], [-0.36, 0.17], [-0.5, 0.27], [-0.47, 0.12], [-0.49, 0.0], [-0.47, -0.12], [-0.5, -0.27], [-0.36, -0.17], [-0.27, -0.07]], 0, 0, smooth),
+    // Tall swept-back dorsal and anal sails.
+    fin([[0.14, 0.26], [0.03, 0.42], [-0.17, 0.62], [-0.36, 0.82], [-0.41, 0.76], [-0.31, 0.46], [-0.24, 0.17]], 0, 0, smooth),
+    fin([[0.1, -0.26], [-0.02, -0.42], [-0.2, -0.62], [-0.36, -0.79], [-0.41, -0.73], [-0.31, -0.44], [-0.24, -0.17]], 0, 0, smooth),
+    // Long ventral filaments.
+    fin([[0.18, -0.22], [0.13, -0.45], [0.07, -0.74], [0.05, -0.73], [0.1, -0.45], [0.15, -0.22]], 0.02, 0.15, smooth),
+    fin([[0.18, -0.22], [0.13, -0.45], [0.07, -0.74], [0.05, -0.73], [0.1, -0.45], [0.15, -0.22]], -0.02, -0.15, smooth),
+    // Pectorals.
+    fin([[0.27, 0.01], [0.2, -0.05], [0.14, -0.04], [0.15, 0.0], [0.2, 0.02]], 0.05, 0.6, smooth),
+    fin([[0.27, 0.01], [0.2, -0.05], [0.14, -0.04], [0.15, 0.0], [0.2, 0.02]], -0.05, -0.6, smooth),
   ]);
 }

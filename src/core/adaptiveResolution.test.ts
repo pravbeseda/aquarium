@@ -1,44 +1,61 @@
 import { describe, expect, it } from 'vitest';
 import { AdaptiveResolution } from './adaptiveResolution';
 
-function feed(ar: AdaptiveResolution, frameMs: number, seconds: number) {
-  let changed = false;
-  for (let t = 0; t < seconds * 1000; t += frameMs) changed = ar.addFrame(frameMs) || changed;
-  return changed;
+const VSYNC_60 = 1000 / 60;
+
+/** Feeds frames whose duration depends on the current scale; returns how many times the scale changed. */
+function run(ar: AdaptiveResolution, frameAt: (scale: number) => number, seconds: number): number {
+  let changes = 0;
+  for (let t = 0; t < seconds * 1000; ) {
+    const ms = frameAt(ar.scale);
+    if (ar.addFrame(ms)) changes++;
+    t += ms;
+  }
+  return changes;
 }
 
+/** A GPU-bound device: frame time follows the pixel count, but never beats the display refresh. */
+const gpuBound = (msAtFullScale: number, refreshMs = VSYNC_60) => (scale: number) => Math.max(refreshMs, msAtFullScale * scale * scale);
+
 describe('AdaptiveResolution', () => {
-  it('lowers the scale when frames are slow', () => {
-    const ar = new AdaptiveResolution({ targetMs: 16.7 });
-    expect(feed(ar, 30, 2.5)).toBe(true);
-    expect(ar.scale).toBeLessThan(1);
+  it('lowers the scale when a GPU-bound frame is slow', () => {
+    const ar = new AdaptiveResolution({ targetMs: 1000 / 58 });
+    expect(run(ar, gpuBound(30), 6)).toBeGreaterThan(0);
+    expect(ar.scale).toBeLessThan(0.85);
   });
 
   it('never goes below the minimum', () => {
-    const ar = new AdaptiveResolution({ targetMs: 16.7, min: 0.5 });
-    feed(ar, 100, 60);
+    const ar = new AdaptiveResolution({ targetMs: 1000 / 58, min: 0.5 });
+    run(ar, gpuBound(200), 60);
     expect(ar.scale).toBeCloseTo(0.5);
-  });
-
-  it('recovers when frames are fast again, up to the maximum', () => {
-    const ar = new AdaptiveResolution({ targetMs: 16.7 });
-    feed(ar, 30, 6);
-    feed(ar, 8, 60);
-    expect(ar.scale).toBeCloseTo(1);
   });
 
   it('recovers on a 60 Hz display, where frames never beat 16.7 ms', () => {
     const ar = new AdaptiveResolution({ targetMs: 1000 / 58 });
-    feed(ar, 30, 6);
-    expect(ar.scale).toBeLessThan(0.75);
-    feed(ar, 1000 / 60, 60);
+    run(ar, gpuBound(30), 6);
+    expect(ar.scale).toBeLessThan(0.85);
+    run(ar, gpuBound(12), 60);
     expect(ar.scale).toBeCloseTo(1);
+  });
+
+  it('recovers on a high-refresh display', () => {
+    const ar = new AdaptiveResolution({ targetMs: 1000 / 58 });
+    run(ar, gpuBound(30, 8), 6);
+    run(ar, () => 8, 60);
+    expect(ar.scale).toBeCloseTo(1);
+  });
+
+  it('keeps full resolution when the display caps the frame rate at 30 Hz', () => {
+    const ar = new AdaptiveResolution({ targetMs: 1000 / 58 });
+    const changes = run(ar, () => 1000 / 30, 60);
+    expect(ar.scale).toBe(1);
+    expect(changes).toBeLessThanOrEqual(2);
   });
 
   it('waits longer after each raise that had to be undone, so a borderline device settles', () => {
     const ar = new AdaptiveResolution({ targetMs: 1000 / 58 });
     // A device that is too slow at full resolution and fine just below it.
-    const frameAt = (scale: number) => (scale > 0.99 ? 24 : 1000 / 60);
+    const frameAt = (scale: number) => (scale > 0.99 ? 24 : VSYNC_60);
     const drops: number[] = [];
     let t = 0;
     while (t < 300_000) {
@@ -56,14 +73,14 @@ describe('AdaptiveResolution', () => {
   });
 
   it('holds steady inside the comfort band', () => {
-    const ar = new AdaptiveResolution({ targetMs: 16.7 });
-    expect(feed(ar, 16.7, 10)).toBe(false);
+    const ar = new AdaptiveResolution({ targetMs: VSYNC_60 });
+    expect(run(ar, () => VSYNC_60, 10)).toBe(0);
   });
 
   it('ignores hitches such as a background tab', () => {
-    const ar = new AdaptiveResolution({ targetMs: 16.7, windowMs: 1000 });
+    const ar = new AdaptiveResolution({ targetMs: VSYNC_60, windowMs: 1000 });
     expect(ar.addFrame(5000)).toBe(false);
     expect(ar.scale).toBe(1);
-    expect(feed(ar, 16.7, 3)).toBe(false);
+    expect(run(ar, () => VSYNC_60, 3)).toBe(0);
   });
 });

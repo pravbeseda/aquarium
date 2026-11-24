@@ -41,7 +41,7 @@ export class FishLife {
 
     const starts = [new Vector3(-0.3, 0.3, 0.06), new Vector3(0.05, 0.38, -0.1), new Vector3(-0.1, 0.42, 0.13)];
     this.angels = starts.map((s) => new Wanderer(rng, s, 0.045));
-    this.angelFish = new InstancedFish(u, { textures: angelTextures(), body: fishBody(ANGEL_PROFILE, 40, 26), fins: angelFins(), length: ANGEL_LENGTH, iridescence: 0.35, roughness: 0.35 }, starts.length);
+    this.angelFish = new InstancedFish(u, { textures: angelTextures(), body: fishBody(ANGEL_PROFILE, 56, 36), fins: angelFins(), length: ANGEL_LENGTH, iridescence: 0.35, roughness: 0.35 }, starts.length);
     this.angelState = starts.map(() => ({ heading: new Vector3(1, 0, 0), phase: rng() * 10, scale: 0.85 + rng() * 0.3 }));
 
     this.group.add(this.neons.group, this.angelFish.group);

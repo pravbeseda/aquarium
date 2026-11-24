@@ -1,8 +1,9 @@
-import { Color, DoubleSide, Group, InstancedMesh, Matrix4, MeshStandardMaterial, Quaternion, Vector3, type BufferGeometry } from 'three';
+import { Color, DoubleSide, Group, InstancedMesh, Matrix4, MeshStandardMaterial, Quaternion, Vector3, type BufferGeometry, type Texture } from 'three';
 import { TANK, substrateHeight, type SphereObstacle } from '../../sim/tank';
 import { createMotionDepthMaterial, patchUnderwater, type UnderwaterUniforms } from '../../render/underwaterMaterial';
 import { mulberry32, range, type Rng } from '../../core/random';
 import { hairgrassTuft, stemPlant, vallisneriaBlade } from './plantGeometry';
+import { ribbonLeafTexture, smallLeafTexture } from './plantTextures';
 import type { QualitySettings } from '../../app/settings';
 
 interface Spot {
@@ -19,6 +20,7 @@ interface Species {
   sway: number;
   translucency: number;
   roughness: number;
+  map?: Texture;
   castShadow: boolean;
   tint: (rng: Rng, c: Color) => Color;
 }
@@ -36,7 +38,7 @@ function blocked(x: number, z: number, obstacles: readonly SphereObstacle[], mar
 function plantSpecies(u: UnderwaterUniforms, species: Species, spots: Spot[], rng: Rng): Group {
   const group = new Group();
   group.name = species.name;
-  const material = new MeshStandardMaterial({ vertexColors: true, side: DoubleSide, roughness: species.roughness, metalness: 0 });
+  const material = new MeshStandardMaterial({ vertexColors: true, map: species.map ?? null, side: DoubleSide, roughness: species.roughness, metalness: 0 });
   patchUnderwater(material, u, { translucency: species.translucency, sway: species.sway });
   const depthMaterial = species.castShadow ? createMotionDepthMaterial(u, { sway: species.sway }) : null;
 
@@ -98,6 +100,7 @@ export function createPlants(u: UnderwaterUniforms, obstacles: readonly SphereOb
       sway: 0.07,
       translucency: 0.8,
       roughness: 0.45,
+      map: ribbonLeafTexture(),
       castShadow: true,
       tint: (r, c) => c.setRGB(range(r, 0.8, 1.05), range(r, 0.9, 1.1), range(r, 0.7, 1.0)),
     }, valSpots, rng),
@@ -133,6 +136,7 @@ export function createPlants(u: UnderwaterUniforms, obstacles: readonly SphereOb
       sway: 0.03,
       translucency: 0.6,
       roughness: 0.5,
+      map: smallLeafTexture(),
       castShadow: true,
       tint: (r, c) => c.setRGB(range(r, 0.85, 1.1), range(r, 0.85, 1.05), range(r, 0.8, 1.0)),
     }, stemSpots, rng),

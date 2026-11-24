@@ -116,6 +116,39 @@ export function neonTextures(): FishTextures {
 
 const ANGEL_BARS = [0.1, 0.33, 0.56, 0.8];
 
+/** Fine overlapping scale rows. */
+function scales(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.strokeStyle = 'rgba(40,45,50,0.12)';
+  ctx.lineWidth = 1;
+  const du = 0.014 * w;
+  const dv = 0.03 * h;
+  for (let row = 0; row * dv < h; row++) {
+    for (let col = 0; col * du < w; col++) {
+      const x = col * du + (row % 2) * du * 0.5;
+      ctx.beginPath();
+      ctx.arc(x, row * dv, du * 0.6, 0.2 * Math.PI, 0.8 * Math.PI);
+      ctx.stroke();
+    }
+  }
+}
+
+/** Fin rays: slanting back through the dorsal and anal sails, fanning out through the tail. Fin UVs: u = 0.5 - z, v = 0.5 + 0.6 y. */
+function finRays(ctx: CanvasRenderingContext2D, size: number) {
+  ctx.strokeStyle = 'rgba(45,50,55,0.5)';
+  ctx.lineWidth = 1.5;
+  const line = (u0: number, v0: number, u1: number, v1: number) => {
+    ctx.beginPath();
+    ctx.moveTo(u0 * size, (1 - v0) * size);
+    ctx.lineTo(u1 * size, (1 - v1) * size);
+    ctx.stroke();
+  };
+  for (let u = 0.3; u < 0.8; u += 0.018) {
+    line(u, 0.64, u + 0.34, 1.0);
+    line(u, 0.36, u + 0.34, 0.0);
+  }
+  for (let k = -6; k <= 6; k++) line(0.76, 0.5 + k * 0.012, 1.0, 0.5 + k * 0.03);
+}
+
 export function angelTextures(): FishTextures {
   const W = 512;
   const H = 256;
@@ -143,6 +176,7 @@ export function angelTextures(): FishTextures {
       target.fillRect((u - width) * w, 0, width * 2 * w, h);
     });
   };
+  scales(ctx, W, H);
   bars(ctx, W, H, 0.85);
   eye(ctx, W, H, 0.1, 0.2, 0.03, 0.05, '#c4452b');
 
@@ -150,10 +184,20 @@ export function angelTextures(): FishTextures {
   ictx.fillStyle = '#777';
   ictx.fillRect(0, 0, 64, 64);
 
-  const [fc, fctx] = canvas(256, 256);
-  fctx.fillStyle = 'rgba(190,196,198,0.62)';
-  fctx.fillRect(0, 0, 256, 256);
-  bars(fctx, 256, 256, 0.85);
+  const F = 512;
+  const [fc, fctx] = canvas(F, F);
+  fctx.fillStyle = 'rgba(150,158,162,0.64)';
+  fctx.fillRect(0, 0, F, F);
+  finRays(fctx, F);
+  bars(fctx, F, F, 0.85);
+  // Dusky outer edges of the dorsal and anal sails (canvas y runs opposite to v).
+  const edge = fctx.createLinearGradient(0, 0, 0, F);
+  edge.addColorStop(0, 'rgba(25,25,25,0.6)');
+  edge.addColorStop(0.18, 'rgba(25,25,25,0)');
+  edge.addColorStop(0.82, 'rgba(25,25,25,0)');
+  edge.addColorStop(1, 'rgba(25,25,25,0.6)');
+  fctx.fillStyle = edge;
+  fctx.fillRect(0, 0, F, F);
 
   return { map: texture(c, true), iridescence: texture(ic, false), fins: texture(fc, true) };
 }

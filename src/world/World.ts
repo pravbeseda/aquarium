@@ -1,7 +1,7 @@
 import { Color, DirectionalLight, HemisphereLight, Scene, Vector3, type Mesh, type PerspectiveCamera, type ShaderMaterial, type Texture } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { TANK, TankCollider } from '../sim/tank';
-import { createUnderwaterUniforms, type UnderwaterUniforms } from '../render/underwaterMaterial';
+import { PLAYER_TRAIL_LENGTH, createUnderwaterUniforms, type UnderwaterUniforms } from '../render/underwaterMaterial';
 import type { QualitySettings } from '../app/settings';
 import type { PbrTextures } from './assets';
 import { createWaterLook, type WaterLook } from './environment';
@@ -24,6 +24,8 @@ export interface WorldAssets {
 }
 
 const lightDirView = new Vector3();
+/** Seconds between samples of the player's path that plants are pushed away from. */
+const TRAIL_INTERVAL = 0.12;
 
 /** Builds the aquarium scene and keeps its animated parts in step with the simulation. */
 export class World {
@@ -38,6 +40,7 @@ export class World {
   private readonly particles: Particles;
   private readonly food: FoodView;
   private readonly lamp: DirectionalLight;
+  private trailTimer = 0;
 
   constructor(assets: WorldAssets, quality: QualitySettings, caustics: Texture) {
     this.look = createWaterLook();
@@ -86,11 +89,23 @@ export class World {
 
   update(dt: number, time: number, camera: PerspectiveCamera, flakes: readonly Flake[], settledLifetime: number, pixelScale: number): void {
     this.uniforms.uTime.value = time;
-    this.uniforms.uPlayerPos.value.copy(camera.position);
+    this.updatePlayerTrail(dt, camera.position);
     (this.surface.material as ShaderMaterial).uniforms.uTime.value = time;
     lightDirView.copy(this.look.lightDir).transformDirection(camera.matrixWorldInverse);
     this.bubbles.update(dt, time, lightDirView);
     this.particles.update(camera.position, pixelScale);
     this.food.update(flakes, settledLifetime);
+  }
+
+  /** Newest point follows the player; older points lag behind and push less, so plants close up gently. */
+  private updatePlayerTrail(dt: number, player: Vector3): void {
+    const trail = this.uniforms.uPlayerTrail.value;
+    this.trailTimer += dt;
+    if (this.trailTimer >= TRAIL_INTERVAL) {
+      this.trailTimer = 0;
+      for (let k = PLAYER_TRAIL_LENGTH - 1; k > 0; k--) trail[k].copy(trail[k - 1]);
+    }
+    trail[0].set(player.x, player.y, player.z, 1);
+    for (let k = 1; k < PLAYER_TRAIL_LENGTH; k++) trail[k].w = 1 - k / PLAYER_TRAIL_LENGTH;
   }
 }
