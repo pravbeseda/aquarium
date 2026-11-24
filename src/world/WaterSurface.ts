@@ -52,8 +52,8 @@ void main() {
     air += uLampRadiance * emitter;
     air *= 1.0 - F;
   }
-  // Alpha carries the mirror fraction for the water pass, which traces the reflection.
-  gl_FragColor = vec4( air, 1.0 - 0.5 * F );
+  // Alpha above 1 carries the mirror fraction for the water pass, which traces the reflection.
+  gl_FragColor = vec4( air, 1.0 + F );
 }
 `;
 

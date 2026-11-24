@@ -92,7 +92,7 @@ vec3 glass( vec3 p, vec3 dir, vec3 n ) {
   float cosI = dot( dir, n );
   float cosCritical = sqrt( 1.0 - 1.0 / ( uGlassEta * uGlassEta ) );
   float F = min( fresnelOut( cosI, uGlassEta ) + 0.03, 1.0 );
-  F = mix( F, 1.0, smoothstep( cosCritical + 0.12, cosCritical, cosI ) );
+  F = mix( F, 1.0, 1.0 - smoothstep( cosCritical, cosCritical + 0.12, cosI ) );
   vec3 color = vec3( 0.0 );
   if ( F < 1.0 ) {
     vec3 refracted = refract( dir, -n, uGlassEta );
@@ -121,28 +121,33 @@ void main() {
   vec4 src = texture2D( tColor, vUv );
   float depth = texture2D( tDepth, vUv ).r;
   vec3 dir = viewRay( vUv );
-  vec3 color;
+  // Alpha in [0, 1] is coverage over the alpha-0 clear (MSAA edges, fins, bubbles: rgb is premultiplied);
+  // the water surface writes 1 + F, its mirror reflectance.
+  float coverage = min( src.a, 1.0 );
+  float mirror = clamp( src.a - 1.0, 0.0, 1.0 );
+  vec3 color = vec3( 0.0 );
   float dist;
 
-  if ( depth >= 0.99999 ) {
+  if ( coverage < 0.999 || depth >= 0.99999 ) {
+    // Whatever does not cover the pixel lets the glass, and the room behind it, show through.
     vec3 n;
     dist = exitWater( dir, n );
-    vec3 behind = throughWater( glass( uCamPos + dir * dist, dir, n ), dist, dir, uCamPos.y );
-    // Nothing opaque here, but transparent things (fins, bubbles, motes) may have been blended over
-    // the alpha-0 clear: alpha is their coverage and rgb their premultiplied colour.
-    color = behind * ( 1.0 - src.a ) + src.rgb;
+    color = throughWater( glass( uCamPos + dir * dist, dir, n ), dist, dir, uCamPos.y ) * ( 1.0 - coverage );
+  }
+
+  if ( depth >= 0.99999 ) {
+    color += src.rgb;
   } else {
     dist = length( viewPosition( vUv, depth ) );
-    color = src.rgb;
-    // The water surface encodes its reflectance in alpha (1 - 0.5 * F).
-    float mirror = clamp( ( 1.0 - src.a ) * 2.0, 0.0, 1.0 );
+    vec3 surface = src.rgb;
     if ( mirror > 0.002 ) {
       vec3 p = uCamPos + dir * dist;
       vec2 w = vec2( sin( p.x * 41.0 + uTime * 1.3 ) + sin( p.z * 57.0 - uTime * 1.7 ), cos( p.z * 43.0 + uTime * 1.1 ) + sin( p.x * 31.0 + uTime ) );
       vec3 n = normalize( vec3( w.x * 0.03, -1.0, w.y * 0.03 ) );
-      color += traceReflection( p, reflect( dir, n ) ) * mirror;
+      surface += traceReflection( p, reflect( dir, n ) ) * mirror;
     }
-    color = throughWater( color, dist, dir, uCamPos.y );
+    vec3 T = exp( -uExtinction * dist );
+    color += surface * T + waterColor( dir, uCamPos.y ) * ( 1.0 - T ) * coverage;
   }
 
   color += texture2D( tShafts, vUv ).rgb;

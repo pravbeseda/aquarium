@@ -1,13 +1,10 @@
-import { CanvasTexture, SRGBColorSpace } from 'three';
+import type { CanvasTexture } from 'three';
 import { mulberry32 } from '../../core/random';
+import { canvasTexture, createCanvas } from '../canvasTexture';
 
 /** Light leaf detail multiplied over the vertex colours: veins, darker margins, a few blemishes. */
 function leafCanvas(width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void): CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('2D canvas is unavailable');
+  const [canvas, ctx] = createCanvas(width, height);
   ctx.fillStyle = '#eef2e6';
   ctx.fillRect(0, 0, width, height);
   const margin = ctx.createLinearGradient(0, 0, width, 0);
@@ -18,10 +15,7 @@ function leafCanvas(width: number, height: number, draw: (ctx: CanvasRenderingCo
   ctx.fillStyle = margin;
   ctx.fillRect(0, 0, width, height);
   draw(ctx);
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  texture.anisotropy = 4;
-  return texture;
+  return canvasTexture(canvas, true);
 }
 
 /** Vallisneria: long parallel veins with faint cross-veinlets, streaks and a few spots. */

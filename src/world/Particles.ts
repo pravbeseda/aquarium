@@ -47,7 +47,7 @@ varying float vBright;
 varying float vFade;
 void main() {
   vec2 c = gl_PointCoord - 0.5;
-  float a = smoothstep( 0.5, 0.1, length( c ) );
+  float a = 1.0 - smoothstep( 0.1, 0.5, length( c ) );
   gl_FragColor = vec4( vec3( 0.9, 0.95, 0.85 ) * vBright * vFade * a, 1.0 );
 }
 `;

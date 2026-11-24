@@ -1,21 +1,7 @@
-import { CanvasTexture, SRGBColorSpace } from 'three';
+import type { CanvasTexture } from 'three';
+import { canvasTexture, createCanvas } from '../canvasTexture';
 
-/** Body textures are painted procedurally; see fishGeometry for the UV layout. */
-function canvas(width: number, height: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
-  const c = document.createElement('canvas');
-  c.width = width;
-  c.height = height;
-  const ctx = c.getContext('2d');
-  if (!ctx) throw new Error('2D canvas is unavailable');
-  return [c, ctx];
-}
-
-function texture(c: HTMLCanvasElement, srgb: boolean): CanvasTexture {
-  const t = new CanvasTexture(c);
-  if (srgb) t.colorSpace = SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
-}
+// Body textures are painted procedurally; see fishGeometry for the UV layout.
 
 /** Paints a horizontal band symmetrically on both flanks (v and 1 - v). */
 function flankBand(ctx: CanvasRenderingContext2D, w: number, h: number, u0: number, u1: number, v: number, halfWidth: number, style: string | CanvasGradient, taper = 0.4) {
@@ -64,7 +50,7 @@ export interface FishTextures {
 export function neonTextures(): FishTextures {
   const W = 512;
   const H = 192;
-  const [c, ctx] = canvas(W, H);
+  const [c, ctx] = createCanvas(W, H);
   ctx.fillStyle = verticalGradient(ctx, H, [
     [0, '#3d3a2a'],
     [0.14, '#55503c'],
@@ -91,17 +77,17 @@ export function neonTextures(): FishTextures {
   flankBand(ctx, W, H, 0.1, 0.86, 0.2, 0.05, blue, 0.3);
   eye(ctx, W, H, 0.085, 0.215, 0.028, 0.06, '#c9d4d6');
 
-  const [ic, ictx] = canvas(W, H);
+  const [ic, ictx] = createCanvas(W, H);
   ictx.fillStyle = '#000';
   ictx.fillRect(0, 0, W, H);
   flankBand(ictx, W, H, 0.1, 0.86, 0.2, 0.06, '#fff', 0.3);
 
-  const [ec, ectx] = canvas(W, H);
+  const [ec, ectx] = createCanvas(W, H);
   ectx.fillStyle = '#000';
   ectx.fillRect(0, 0, W, H);
   flankBand(ectx, W, H, 0.1, 0.86, 0.2, 0.045, '#18a8ff', 0.3);
 
-  const [fc, fctx] = canvas(256, 256);
+  const [fc, fctx] = createCanvas(256, 256);
   fctx.fillStyle = 'rgba(235,240,245,0.38)';
   fctx.fillRect(0, 0, 256, 256);
   const base = fctx.createLinearGradient(0.8 * 256, 0, 256, 0);
@@ -111,7 +97,7 @@ export function neonTextures(): FishTextures {
   fctx.fillStyle = base;
   fctx.fillRect(0, 0, 256, 256);
 
-  return { map: texture(c, true), iridescence: texture(ic, false), fins: texture(fc, true), emissive: texture(ec, true) };
+  return { map: canvasTexture(c, true), iridescence: canvasTexture(ic, false), fins: canvasTexture(fc, true), emissive: canvasTexture(ec, true) };
 }
 
 const ANGEL_BARS = [0.1, 0.33, 0.56, 0.8];
@@ -152,7 +138,7 @@ function finRays(ctx: CanvasRenderingContext2D, size: number) {
 export function angelTextures(): FishTextures {
   const W = 512;
   const H = 256;
-  const [c, ctx] = canvas(W, H);
+  const [c, ctx] = createCanvas(W, H);
   ctx.fillStyle = verticalGradient(ctx, H, [
     [0, '#4f4b3c'],
     [0.12, '#77766b'],
@@ -180,12 +166,12 @@ export function angelTextures(): FishTextures {
   bars(ctx, W, H, 0.85);
   eye(ctx, W, H, 0.1, 0.2, 0.03, 0.05, '#c4452b');
 
-  const [ic, ictx] = canvas(64, 64);
+  const [ic, ictx] = createCanvas(64, 64);
   ictx.fillStyle = '#777';
   ictx.fillRect(0, 0, 64, 64);
 
   const F = 512;
-  const [fc, fctx] = canvas(F, F);
+  const [fc, fctx] = createCanvas(F, F);
   fctx.fillStyle = 'rgba(150,158,162,0.64)';
   fctx.fillRect(0, 0, F, F);
   finRays(fctx, F);
@@ -199,5 +185,5 @@ export function angelTextures(): FishTextures {
   fctx.fillStyle = edge;
   fctx.fillRect(0, 0, F, F);
 
-  return { map: texture(c, true), iridescence: texture(ic, false), fins: texture(fc, true) };
+  return { map: canvasTexture(c, true), iridescence: canvasTexture(ic, false), fins: canvasTexture(fc, true) };
 }

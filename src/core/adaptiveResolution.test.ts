@@ -45,11 +45,32 @@ describe('AdaptiveResolution', () => {
     expect(ar.scale).toBeCloseTo(1);
   });
 
-  it('keeps full resolution when the display caps the frame rate at 30 Hz', () => {
+  it('keeps full resolution almost all the time when the display caps the frame rate at 30 Hz', () => {
     const ar = new AdaptiveResolution({ targetMs: 1000 / 58 });
-    const changes = run(ar, () => 1000 / 30, 60);
+    const frameMs = 1000 / 30;
+    let atFull = 0;
+    let total = 0;
+    while (total < 120_000) {
+      ar.addFrame(frameMs);
+      total += frameMs;
+      if (ar.scale === 1) atFull += frameMs;
+    }
+    expect(atFull / total).toBeGreaterThan(0.9);
     expect(ar.scale).toBe(1);
-    expect(changes).toBeLessThanOrEqual(2);
+  });
+
+  it('can still lower the scale after an early 30 Hz phase', () => {
+    const ar = new AdaptiveResolution({ targetMs: 1000 / 58, min: 0.6 });
+    run(ar, () => 1000 / 30, 20);
+    run(ar, gpuBound(28), 120);
+    expect(ar.scale).toBeLessThan(0.95);
+  });
+
+  it('finds a scale that reaches 60 Hz when frames snap to whole vblanks', () => {
+    const ar = new AdaptiveResolution({ targetMs: 1000 / 58, min: 0.6 });
+    const vblank = (scale: number) => Math.ceil((25 * scale * scale) / VSYNC_60 - 1e-6) * VSYNC_60;
+    run(ar, vblank, 120);
+    expect(vblank(ar.scale)).toBeCloseTo(VSYNC_60);
   });
 
   it('waits longer after each raise that had to be undone, so a borderline device settles', () => {
