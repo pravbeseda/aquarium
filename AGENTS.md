@@ -11,7 +11,7 @@ A browser game: first-person life of a small fish in a planted aquarium. Vite + 
 ## Layout
 
 - `src/sim` — pure simulation (tank bounds, swimming, school, wanderers, food). No rendering; unit-tested.
-- `src/render` — render pipeline: scene → `ShaftsPass` (half-res light shafts) → `WaterPass` (absorption, glass, room, reflections) → bloom → `FinalPass` (lens, tone mapping).
+- `src/render` — render pipeline: scene → `ShaftsPass` (half-res light shafts) → `WaterPass` (absorption, glass, room, reflections) → bloom → `HalfResBlur` → `FinalPass` (distance blur, lens, tone mapping).
 - `src/render/underwaterMaterial.ts` — patches three.js materials (caustics, translucency, plant sway, fish swimming) through anchors in three's shader chunks. `shaderPatch.test.ts` fails loudly when a three.js upgrade moves an anchor; fix the anchor, do not delete the test.
 - `src/world` — scene content; `environment.ts` holds the art direction (water colour, lamp, room placement).
 - `src/input`, `src/ui`, `src/app` — controls, DOM overlay, composition root.
@@ -20,6 +20,7 @@ A browser game: first-person life of a small fish in a planted aquarium. Vite + 
 
 - World units are metres; the tank interior is `TANK` in `src/sim/tank.ts`, Y up, front glass at +Z.
 - The scene clears to alpha 0, so alpha is coverage: `WaterPass` shows the glass and the room behind any pixel not fully covered (MSAA edges, fins, bubbles). Additive effects must use `ADDITIVE_KEEP_ALPHA` so they do not overwrite it.
+- Post-processing reads distances from the depth buffer, so transparent things that should be fogged and blurred by their own distance (fins, bubbles) write depth.
 - The water surface is a flat plane at `TANK.waterLevel`; its waves live only in the normals (`wavesGlsl.ts`), so `WaterPass` recognises surface pixels by height and adds their mirror reflection itself.
 - Randomness that shapes the scene is seeded (`mulberry32`) so every load looks the same.
 

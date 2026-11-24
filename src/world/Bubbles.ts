@@ -107,7 +107,8 @@ export class Bubbles {
       vertexShader,
       fragmentShader,
       transparent: true,
-      depthWrite: false,
+      // Bubbles write depth so the distance blur and fog treat them by their own distance.
+      depthWrite: true,
       ...ADDITIVE_KEEP_ALPHA,
     });
     const count = 140;

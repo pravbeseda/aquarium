@@ -35,8 +35,7 @@ float valueNoise( vec2 p ) {
 void main() {
   float depth = texture2D( tDepth, vUv ).r;
   vec3 dir = viewRay( vUv );
-  vec3 normal;
-  float dist = depth >= 0.99999 ? exitWater( dir, normal ) : length( viewPosition( vUv, depth ) );
+  float dist = visibleDistance( vUv, depth, dir );
 
   float maxT = min( dist, 1.4 );
   float stepLen = maxT / float( SHAFT_STEPS );

@@ -2,6 +2,9 @@ import { Vector3 } from 'three';
 import type { Rng } from '../core/random';
 import { TANK, substrateHeight } from './tank';
 
+/** Floating flakes hang this far below the surface plane, which the water pass recognises by height. */
+export const FLAKE_FLOAT_DEPTH = 0.004;
+
 export interface Flake {
   position: Vector3;
   /** Horizontal drift velocity while sinking. */
@@ -103,7 +106,7 @@ export class FoodSystem {
       const a = this.rng() * Math.PI * 2;
       const r = Math.sqrt(this.rng()) * 0.05;
       this.flakes.push({
-        position: new Vector3(cx + Math.cos(a) * r, TANK.waterLevel, cz + Math.sin(a) * r),
+        position: new Vector3(cx + Math.cos(a) * r, TANK.waterLevel - FLAKE_FLOAT_DEPTH, cz + Math.sin(a) * r),
         drift: new Vector3((this.rng() - 0.5) * 0.02, 0, (this.rng() - 0.5) * 0.02),
         floatTime: 0.5 + this.rng() * 2.5,
         sinkSpeed: 0.018 + this.rng() * 0.014,

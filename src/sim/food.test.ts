@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
-import { FoodSystem } from './food';
+import { FLAKE_FLOAT_DEPTH, FoodSystem } from './food';
 import { TANK, substrateHeight } from './tank';
 import { mulberry32 } from '../core/random';
 
@@ -13,7 +13,9 @@ describe('FoodSystem', () => {
     expect(food.flakes.length).toBe(0);
     for (let t = 0; t < 0.2; t += dt) food.update(dt, []);
     expect(food.flakes.length).toBe(10);
-    for (const f of food.flakes) expect(f.position.y).toBeCloseTo(TANK.waterLevel, 2);
+    // Floating flakes sit just under the surface plane, so the water pass never mistakes them for it.
+    expect(FLAKE_FLOAT_DEPTH).toBeGreaterThanOrEqual(0.003);
+    for (const f of food.flakes) expect(f.position.y).toBeCloseTo(TANK.waterLevel - FLAKE_FLOAT_DEPTH, 6);
   });
 
   it('lets flakes sink and settle on the substrate', () => {

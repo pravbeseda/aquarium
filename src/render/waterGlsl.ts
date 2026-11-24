@@ -35,6 +35,12 @@ float exitWater( vec3 dir, out vec3 normal ) {
   normal = t == tFar.x ? vec3( sign( dir.x ), 0.0, 0.0 ) : ( t == tFar.y ? vec3( 0.0, sign( dir.y ), 0.0 ) : vec3( 0.0, 0.0, sign( dir.z ) ) );
   return t;
 }
+
+// Distance to what the pixel shows: the geometry in the depth buffer, or else the glass the ray leaves through.
+float visibleDistance( vec2 uv, float depth, vec3 dir ) {
+  vec3 normal;
+  return depth >= 0.99999 ? exitWater( dir, normal ) : length( viewPosition( uv, depth ) );
+}
 `;
 
 export function viewRayUniforms(look: WaterLook) {

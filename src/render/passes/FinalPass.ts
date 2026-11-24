@@ -30,9 +30,7 @@ void main() {
     texture2D( tColor, vUv + offset ).b
   );
   // Light scattered on its way through the water softens distant things (uDistanceBlur: start, end, strength).
-  float depth = texture2D( tDepth, vUv ).r;
-  vec3 normal;
-  float dist = depth >= 0.99999 ? exitWater( viewRay( vUv ), normal ) : length( viewPosition( vUv, depth ) );
+  float dist = visibleDistance( vUv, texture2D( tDepth, vUv ).r, viewRay( vUv ) );
   float soften = smoothstep( uDistanceBlur.x, uDistanceBlur.y, dist ) * uDistanceBlur.z;
   color = mix( color, texture2D( tBlurred, vUv ).rgb, soften );
   color *= 1.0 - uVignette * smoothstep( 0.05, 0.55, r2 );

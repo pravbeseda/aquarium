@@ -54,7 +54,8 @@ export class InstancedFish {
       side: DoubleSide,
       roughness: 0.4,
       metalness: 0,
-      depthWrite: false,
+      // Fins write depth so the water pass fogs, blurs and mirrors them by their own distance.
+      depthWrite: true,
     });
     patchUnderwater(finMaterial, u, { swim: true, translucency: 0.9 });
 

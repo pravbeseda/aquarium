@@ -1,4 +1,4 @@
-import { Matrix4, ShaderMaterial, Vector2, type DepthTexture, type PerspectiveCamera, type Texture, type WebGLRenderer, type WebGLRenderTarget } from 'three';
+import { MathUtils, Matrix4, ShaderMaterial, Vector2, type DepthTexture, type PerspectiveCamera, type Texture, type WebGLRenderer, type WebGLRenderTarget } from 'three';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { ROOM_PARS } from '../roomGlsl';
 import { FULLSCREEN_VERTEX, VIEW_RAY_GLSL, updateViewRayUniforms, viewRayUniforms } from '../waterGlsl';
@@ -19,6 +19,7 @@ uniform float uGlassEta;
 uniform float uTime;
 uniform vec2 uTexel;
 uniform vec3 uAgitation;
+uniform float uPixelAngle;
 varying vec2 vUv;
 
 ${VIEW_RAY_GLSL}
@@ -142,8 +143,9 @@ void main() {
     dist = length( viewPosition( vUv, depth ) );
     vec3 surface = src.rgb;
     vec3 p = uCamPos + dir * dist;
-    // The water surface is the flat plane at the water level; its waves live in the normals.
-    if ( abs( p.y - uBoxMax.y ) < 0.0008 ) {
+    // The water surface is the flat plane at the water level; its waves live in the normals. The tolerance grows
+    // with the pixel footprint because the resolved MSAA depth can come from a sample off the pixel centre.
+    if ( abs( p.y - uBoxMax.y ) < 0.0008 + 1.5 * dist * uPixelAngle ) {
       vec3 n = waveNormal( p.xz, uTime, uAgitation );
       float F = waterToAirFresnel( max( dot( dir, n ), 0.02 ) );
       surface += traceReflection( p, reflect( dir, n ) ) * F * coverage;
@@ -193,6 +195,7 @@ export class WaterPass {
         uTime: { value: 0 },
         uTexel: { value: new Vector2() },
         uAgitation: { value: look.surfaceAgitation },
+        uPixelAngle: { value: 0 },
       },
       vertexShader: FULLSCREEN_VERTEX,
       fragmentShader,
@@ -212,6 +215,7 @@ export class WaterPass {
     u.uViewProj.value.copy(this.viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     u.uTime.value = time;
     u.uTexel.value.set(1.5 / target.width, 1.5 / target.height);
+    u.uPixelAngle.value = (2 * Math.tan(MathUtils.degToRad(camera.fov / camera.zoom) / 2)) / target.height;
 
     renderer.setRenderTarget(target);
     this.quad.render(renderer);
