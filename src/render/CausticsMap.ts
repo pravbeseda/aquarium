@@ -57,10 +57,4 @@ export class CausticsMap {
     this.quad.render(renderer);
     renderer.setRenderTarget(previous);
   }
-
-  dispose(): void {
-    this.target.dispose();
-    this.material.dispose();
-    this.quad.dispose();
-  }
 }

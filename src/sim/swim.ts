@@ -24,12 +24,10 @@ export interface Swimmer {
   velocity: Vector3;
   yaw: number;
   pitch: number;
-  /** Normalised thrust in [0, 1], drives tail-beat bobbing of the camera. */
-  effort: number;
 }
 
 export function createSwimmer(position: Vector3, yaw: number, pitch: number): Swimmer {
-  return { position: position.clone(), velocity: new Vector3(), yaw, pitch, effort: 0 };
+  return { position: position.clone(), velocity: new Vector3(), yaw, pitch };
 }
 
 /** Unit look direction for a YXZ (yaw, then pitch) camera that faces -Z at rest. */
@@ -58,7 +56,6 @@ export function stepSwimmer(s: Swimmer, intent: SwimIntent, dt: number, collider
     .addScaledVector(right, intent.strafe)
     .addScaledVector(UP, intent.rise);
   const amount = Math.min(1, wish.length());
-  s.effort = amount * (intent.boost ? 1 : 0.6);
 
   if (amount > 1e-4) {
     const maxSpeed = intent.boost ? SWIM.boostSpeed : SWIM.cruiseSpeed;

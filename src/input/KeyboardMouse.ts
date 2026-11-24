@@ -16,7 +16,6 @@ const BINDINGS: Record<string, [keyof Omit<SwimIntent, 'boost'>, number] | 'boos
   KeyE: ['rise', 1],
   KeyC: ['rise', -1],
   KeyQ: ['rise', -1],
-  ControlLeft: ['rise', -1],
   ShiftLeft: 'boost',
   ShiftRight: 'boost',
 };
@@ -30,20 +29,21 @@ export class KeyboardMouse implements InputSource {
   private pitch = 0;
   private enabled = false;
   private dragging = false;
-  private readonly abort = new AbortController();
 
   constructor(element: HTMLElement) {
     this.element = element;
-    const signal = this.abort.signal;
-    window.addEventListener('keydown', (e) => this.onKey(e, true), { signal });
-    window.addEventListener('keyup', (e) => this.onKey(e, false), { signal });
-    window.addEventListener('blur', () => this.held.clear(), { signal });
-    document.addEventListener('mousemove', (e) => this.onMouseMove(e), { signal });
+    window.addEventListener('keydown', (e) => this.onKey(e, true));
+    window.addEventListener('keyup', (e) => this.onKey(e, false));
+    window.addEventListener('blur', () => {
+      this.held.clear();
+      this.recompute();
+    });
+    document.addEventListener('mousemove', (e) => this.onMouseMove(e));
     element.addEventListener('mousedown', (e) => {
       if (!this.enabled || e.button !== 0) return;
       if (document.pointerLockElement !== element) this.dragging = true;
-    }, { signal });
-    window.addEventListener('mouseup', () => (this.dragging = false), { signal });
+    });
+    window.addEventListener('mouseup', () => (this.dragging = false));
   }
 
   get locked(): boolean {
@@ -75,10 +75,6 @@ export class KeyboardMouse implements InputSource {
       this.held.clear();
       this.recompute();
     }
-  }
-
-  dispose(): void {
-    this.abort.abort();
   }
 
   private onKey(e: KeyboardEvent, down: boolean): void {

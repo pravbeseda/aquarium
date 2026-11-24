@@ -6,6 +6,15 @@ function byId<T extends HTMLElement>(id: string): T {
   return el as T;
 }
 
+/** Switches the start screen to an error message; works before the HUD or the renderer exist. */
+export function showFatalError(message: string): void {
+  byId('overlay').classList.remove('hidden');
+  const status = byId('status');
+  status.textContent = message;
+  status.classList.add('error');
+  byId('start').hidden = true;
+}
+
 /** The DOM layer: start screen, loading progress, hints and the fullscreen button. */
 export class Hud {
   private readonly overlay = byId<HTMLDivElement>('overlay');
@@ -69,12 +78,5 @@ export class Hud {
     this.toast.classList.add('visible');
     window.clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => this.toast.classList.remove('visible'), 4500);
-  }
-
-  fail(message: string): void {
-    this.overlay.classList.remove('hidden');
-    this.status.textContent = message;
-    this.status.classList.add('error');
-    this.startButton.hidden = true;
   }
 }

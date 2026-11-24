@@ -7,7 +7,6 @@ export interface InputSource {
   /** Look rotation accumulated since the last call, in radians (yaw, pitch). */
   takeLook(): [number, number];
   setEnabled(enabled: boolean): void;
-  dispose(): void;
 }
 
 export function idleIntent(): SwimIntent {
@@ -47,9 +46,5 @@ export class Controls {
 
   setEnabled(enabled: boolean): void {
     for (const s of this.sources) s.setEnabled(enabled);
-  }
-
-  dispose(): void {
-    for (const s of this.sources) s.dispose();
   }
 }

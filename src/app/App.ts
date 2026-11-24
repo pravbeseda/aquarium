@@ -12,7 +12,7 @@ import { FoodSystem } from '../sim/food';
 import { Controls } from '../input/Controls';
 import { KeyboardMouse } from '../input/KeyboardMouse';
 import { TouchControls } from '../input/TouchControls';
-import { Hud } from '../ui/Hud';
+import { Hud, showFatalError } from '../ui/Hud';
 
 const SETTLED_LIFETIME = 25;
 const START_POSE = { position: new Vector3(0.42, 0.24, 0.17), yaw: 0.95, pitch: 0.04 };
@@ -64,7 +64,7 @@ export class App {
     root.prepend(this.renderer.domElement);
     this.renderer.domElement.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
-      this.hud.fail('The browser reset the graphics. Please reload the page.');
+      showFatalError('The browser reset the graphics. Please reload the page.');
     });
 
     this.keyboard = new KeyboardMouse(this.renderer.domElement);

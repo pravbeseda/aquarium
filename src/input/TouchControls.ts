@@ -20,7 +20,6 @@ export class TouchControls implements InputSource {
   private yaw = 0;
   private pitch = 0;
   private enabled = false;
-  private readonly abort = new AbortController();
 
   constructor(layer: HTMLElement) {
     this.layer = layer;
@@ -31,11 +30,10 @@ export class TouchControls implements InputSource {
     this.base.append(this.knob);
     layer.append(this.base);
 
-    const signal = this.abort.signal;
-    layer.addEventListener('pointerdown', (e) => this.down(e), { signal });
-    layer.addEventListener('pointermove', (e) => this.move(e), { signal });
-    layer.addEventListener('pointerup', (e) => this.up(e), { signal });
-    layer.addEventListener('pointercancel', (e) => this.up(e), { signal });
+    layer.addEventListener('pointerdown', (e) => this.down(e));
+    layer.addEventListener('pointermove', (e) => this.move(e));
+    layer.addEventListener('pointerup', (e) => this.up(e));
+    layer.addEventListener('pointercancel', (e) => this.up(e));
   }
 
   takeLook(): [number, number] {
@@ -49,11 +47,6 @@ export class TouchControls implements InputSource {
     this.enabled = enabled;
     this.layer.classList.toggle('active', enabled);
     if (!enabled) this.reset();
-  }
-
-  dispose(): void {
-    this.abort.abort();
-    this.base.remove();
   }
 
   private down(e: PointerEvent): void {

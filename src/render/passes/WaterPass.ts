@@ -191,9 +191,4 @@ export class WaterPass {
     renderer.setRenderTarget(target);
     this.quad.render(renderer);
   }
-
-  dispose(): void {
-    this.material.dispose();
-    this.quad.dispose();
-  }
 }

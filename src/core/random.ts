@@ -15,8 +15,3 @@ export function mulberry32(seed: number): Rng {
 export function range(rng: Rng, min: number, max: number): number {
   return min + (max - min) * rng();
 }
-
-/** Approximately normal sample (Irwin–Hall with 3 terms), mean 0, sd ≈ 1. */
-export function gaussian(rng: Rng): number {
-  return (rng() + rng() + rng() - 1.5) * 2;
-}

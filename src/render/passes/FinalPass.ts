@@ -63,9 +63,4 @@ export class FinalPass {
     renderer.setRenderTarget(null);
     this.quad.render(renderer);
   }
-
-  dispose(): void {
-    this.material.dispose();
-    this.quad.dispose();
-  }
 }

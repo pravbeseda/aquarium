@@ -1,6 +1,6 @@
 import { Color, DoubleSide, Group, InstancedMesh, Matrix4, MeshStandardMaterial, Quaternion, Vector3, type BufferGeometry } from 'three';
 import { TANK, substrateHeight, type SphereObstacle } from '../../sim/tank';
-import { createMotionDepthMaterial, patchUnderwater, type SwayOptions, type UnderwaterUniforms } from '../../render/underwaterMaterial';
+import { createMotionDepthMaterial, patchUnderwater, type UnderwaterUniforms } from '../../render/underwaterMaterial';
 import { mulberry32, range, type Rng } from '../../core/random';
 import { hairgrassTuft, stemPlant, vallisneriaBlade } from './plantGeometry';
 import type { QualitySettings } from '../../app/settings';
@@ -15,7 +15,8 @@ interface Species {
   name: string;
   variants: number;
   build: (rng: Rng) => BufferGeometry;
-  sway: SwayOptions;
+  /** Tip displacement in metres. */
+  sway: number;
   translucency: number;
   roughness: number;
   castShadow: boolean;
@@ -94,7 +95,7 @@ export function createPlants(u: UnderwaterUniforms, obstacles: readonly SphereOb
       name: 'vallisneria',
       variants: 4,
       build: vallisneriaBlade,
-      sway: { amplitude: 0.07, height: 1 },
+      sway: 0.07,
       translucency: 0.8,
       roughness: 0.45,
       castShadow: true,
@@ -129,7 +130,7 @@ export function createPlants(u: UnderwaterUniforms, obstacles: readonly SphereOb
       name: 'rotala',
       variants: 5,
       build: stemPlant,
-      sway: { amplitude: 0.03, height: 1 },
+      sway: 0.03,
       translucency: 0.6,
       roughness: 0.5,
       castShadow: true,
@@ -153,7 +154,7 @@ export function createPlants(u: UnderwaterUniforms, obstacles: readonly SphereOb
       name: 'hairgrass',
       variants: 3,
       build: hairgrassTuft,
-      sway: { amplitude: 0.006, height: 1 },
+      sway: 0.006,
       translucency: 0.7,
       roughness: 0.5,
       castShadow: false,

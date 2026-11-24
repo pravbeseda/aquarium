@@ -66,13 +66,4 @@ export class RenderPipeline {
     this.bloom?.render(renderer, this.waterTarget, this.waterTarget, dt, false);
     this.finalPass.render(renderer, this.waterTarget.texture, time);
   }
-
-  dispose(): void {
-    this.sceneTarget.dispose();
-    this.waterTarget.dispose();
-    this.waterPass.dispose();
-    this.shaftsPass.dispose();
-    this.bloom?.dispose();
-    this.finalPass.dispose();
-  }
 }

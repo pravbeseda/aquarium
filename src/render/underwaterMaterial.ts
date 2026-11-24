@@ -40,18 +40,11 @@ export const PROGRAM_ANCHORS = {
   fragment: ['#include <common>', '#include <lights_fragment_begin>'],
 } as const;
 
-export interface SwayOptions {
-  /** Tip displacement in metres at full current. */
-  amplitude: number;
-  /** Local-space height of the plant geometry; bending grows towards it. */
-  height: number;
-}
-
 export interface UnderwaterOptions {
   /** Strength of light shining through thin leaves and fins from behind. */
   translucency?: number;
-  /** Bend instanced plants with the current and away from the player. */
-  sway?: SwayOptions;
+  /** Bend instanced plants (geometry one unit tall) with the current and away from the player: tip displacement in metres. */
+  sway?: number;
   /** Undulate instanced fish; needs an instanced `aSwim` (phase, amplitude) attribute. */
   swim?: boolean;
 }
@@ -61,7 +54,6 @@ uniform float uTime;
 uniform vec3 uCurrentDir;
 uniform vec3 uPlayerPos;
 uniform float uSwayAmp;
-uniform float uSwayHeight;
 `;
 
 // Bends an instanced plant in world space, then maps the offset back to local space.
@@ -69,7 +61,7 @@ uniform float uSwayHeight;
 const SWAY_VERTEX = /* glsl */ `
 #ifdef USE_INSTANCING
 {
-  float h = clamp( position.y / uSwayHeight, 0.0, 1.0 );
+  float h = clamp( position.y, 0.0, 1.0 );
   mat3 im = mat3( instanceMatrix );
   float sc2 = dot( im[ 0 ], im[ 0 ] );
   vec3 root = ( modelMatrix * instanceMatrix * vec4( 0.0, 0.0, 0.0, 1.0 ) ).xyz;
@@ -81,7 +73,7 @@ const SWAY_VERTEX = /* glsl */ `
             + side * 0.35 * sin( uTime * 1.37 + ph * 1.3 - h * 2.6 );
   offs *= uSwayAmp;
   vec3 away = wp - uPlayerPos;
-  float worldHeight = uSwayHeight * sqrt( sc2 );
+  float worldHeight = sqrt( sc2 );
   float push = 1.0 - smoothstep( 0.012, 0.075, length( away ) );
   offs += normalize( vec3( away.x, 0.0, away.z ) + 1e-5 ) * push * min( 0.05, worldHeight * 0.7 );
   offs *= h * h;
@@ -150,13 +142,13 @@ const DIRECT_LIGHT_PATCH = /* glsl */ `
 		#endif
 `;
 
-function swayUniforms(sway: SwayOptions) {
-  return { uSwayAmp: { value: sway.amplitude }, uSwayHeight: { value: sway.height } };
+function swayUniforms(amplitude: number) {
+  return { uSwayAmp: { value: amplitude } };
 }
 
 function patchVertexMotion(vertexShader: string, opts: UnderwaterOptions): string {
   let vs = vertexShader;
-  if (opts.sway) {
+  if (opts.sway !== undefined) {
     vs = insertAfter(vs, '#include <common>', SWAY_PARS);
     vs = insertAfter(vs, '#include <begin_vertex>', SWAY_VERTEX);
   }
@@ -169,9 +161,8 @@ function patchVertexMotion(vertexShader: string, opts: UnderwaterOptions): strin
 
 /** Adds caustic lighting, optional translucency and optional vertex motion to a lit three.js material. */
 export function patchUnderwater(material: Material, u: UnderwaterUniforms, opts: UnderwaterOptions = {}): void {
-  const extra = opts.sway ? swayUniforms(opts.sway) : {};
-  material.userData.underwater = extra;
-  const key = `uw:${opts.translucency ?? 0}:${opts.sway ? 1 : 0}:${opts.swim ? 1 : 0}`;
+  const extra = opts.sway !== undefined ? swayUniforms(opts.sway) : {};
+  const key = `uw:${opts.translucency ?? 0}:${opts.sway !== undefined ? 1 : 0}:${opts.swim ? 1 : 0}`;
 
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     Object.assign(shader.uniforms, u, extra);
@@ -194,11 +185,11 @@ export function patchUnderwater(material: Material, u: UnderwaterUniforms, opts:
 /** Shadow-pass material that bends with the same motion as the visible plant or fish. */
 export function createMotionDepthMaterial(u: UnderwaterUniforms, opts: UnderwaterOptions): MeshDepthMaterial {
   const material = new MeshDepthMaterial();
-  const extra = opts.sway ? swayUniforms(opts.sway) : {};
+  const extra = opts.sway !== undefined ? swayUniforms(opts.sway) : {};
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     Object.assign(shader.uniforms, u, extra);
     shader.vertexShader = patchVertexMotion(shader.vertexShader, opts);
   };
-  material.customProgramCacheKey = () => `uw-depth:${opts.sway ? 1 : 0}:${opts.swim ? 1 : 0}`;
+  material.customProgramCacheKey = () => `uw-depth:${opts.sway !== undefined ? 1 : 0}:${opts.swim ? 1 : 0}`;
   return material;
 }

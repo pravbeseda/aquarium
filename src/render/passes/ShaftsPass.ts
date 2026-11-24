@@ -122,13 +122,4 @@ export class ShaftsPass {
     renderer.setRenderTarget(this.target);
     this.quad.render(renderer);
   }
-
-  dispose(): void {
-    this.target.dispose();
-    this.temp.dispose();
-    this.material.dispose();
-    this.blurH.dispose();
-    this.blurV.dispose();
-    this.quad.dispose();
-  }
 }
