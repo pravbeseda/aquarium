@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#04110f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="A first-person aquarium: swim as a small fish through a planted tank." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./icon-192.png" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <title>Aquarium</title>
+  </head>
+  <body>
+    <main id="app">
+      <div id="touch-layer"></div>
+
+      <div id="hud">
+        <button id="fullscreen" type="button" aria-label="Toggle fullscreen" title="Fullscreen (F)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+        </button>
+        <div id="hint" role="status">
+          <span class="desktop-only"><b>WASD</b> swim · <b>mouse</b> look · <b>Space</b>/<b>C</b> up/down · <b>Shift</b> faster · <b>F</b> fullscreen · <b>Esc</b> pause</span>
+          <span class="touch-only"><b>Left thumb</b> swim (push to the rim to dash) · <b>right thumb</b> look around</span>
+        </div>
+        <div id="toast" role="status"></div>
+      </div>
+
+      <div id="overlay">
+        <div class="card">
+          <h1>Aquarium</h1>
+          <p class="lede">You are a small fish in a planted tank. Flakes drop in from time to time — catch them before the neons do.</p>
+          <div id="progress"><div id="progress-bar"></div></div>
+          <p id="status">Loading…</p>
+          <button id="start" type="button" disabled>Loading…</button>
+          <p class="controls desktop-only">WASD to swim, mouse to look around</p>
+          <p class="controls touch-only">Left thumb swims, right thumb looks</p>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
