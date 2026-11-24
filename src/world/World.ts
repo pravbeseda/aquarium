@@ -79,8 +79,8 @@ export class World {
     scene.add(hardscape.group);
     scene.add(createPlants(this.uniforms, hardscape.obstacles, quality));
 
-    this.bubbles = new Bubbles(this.uniforms, this.look.lampColor);
-    this.surface = createWaterSurface(this.look, assets.room, this.bubbles.source);
+    this.bubbles = new Bubbles(this.uniforms, this.look.lampColor, this.look.aerator);
+    this.surface = createWaterSurface(this.look, assets.room);
     this.fish = new FishLife(this.uniforms, quality.neonCount);
     this.particles = new Particles(this.uniforms, this.look, quality.particles);
     this.food = new FoodView(this.uniforms, 96);

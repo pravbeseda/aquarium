@@ -1,4 +1,4 @@
-import { Color, Matrix3, Vector3 } from 'three';
+import { Color, Matrix3, Vector2, Vector3 } from 'three';
 import { TANK } from '../sim/tank';
 
 /** Art direction for the water, the lamp and the room; one place to tune the look. */
@@ -25,6 +25,10 @@ export interface WaterLook {
   roomBlur: number;
   /** Relative index used at the glass; below water's 1.333 to widen the view out of the tank. */
   glassEta: number;
+  /** Where the air stone sits on the floor (x, z). */
+  aerator: Vector2;
+  /** Ripples on the surface above the bubble column: x, z and height in metres. */
+  surfaceAgitation: Vector3;
   /** Pendant LED lamp above the open-top tank, seen through the surface. */
   lamp: { center: Vector3; halfSize: [number, number]; radiance: Vector3 };
 }
@@ -32,6 +36,7 @@ export interface WaterLook {
 export function createWaterLook(): WaterLook {
   const roomYaw = -0.43;
   const lampColor = new Color(1.0, 0.95, 0.86);
+  const aerator = new Vector2(TANK.min.x + 0.1, TANK.min.z + 0.06);
   return {
     waterBoxMin: new Vector3(TANK.min.x, TANK.min.y, TANK.min.z),
     waterBoxMax: new Vector3(TANK.max.x, TANK.waterLevel, TANK.max.z),
@@ -52,6 +57,8 @@ export function createWaterLook(): WaterLook {
     roomRotation: new Matrix3().set(Math.cos(roomYaw), 0, Math.sin(roomYaw), 0, 1, 0, -Math.sin(roomYaw), 0, Math.cos(roomYaw)),
     roomBlur: 0.15,
     glassEta: 1.07,
+    aerator,
+    surfaceAgitation: new Vector3(aerator.x, aerator.y, 0.0016),
     lamp: {
       center: new Vector3(0, TANK.waterLevel + 0.32, 0),
       halfSize: [0.5, 0.09],

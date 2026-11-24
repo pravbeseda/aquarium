@@ -68,7 +68,6 @@ interface Bubble {
 /** An air stone in the back corner with its airline, releasing a stream of wobbling bubbles. */
 export class Bubbles {
   readonly group = new Group();
-  readonly source: Vector2;
   private readonly bubbles: Bubble[] = [];
   private readonly mesh: InstancedMesh;
   private readonly material: ShaderMaterial;
@@ -76,11 +75,9 @@ export class Bubbles {
   private readonly origin: Vector3;
   private spawnDebt = 0;
 
-  constructor(u: UnderwaterUniforms, lampColor: Color) {
-    const x = TANK.min.x + 0.1;
-    const z = TANK.min.z + 0.06;
+  constructor(u: UnderwaterUniforms, lampColor: Color, aerator: Vector2) {
+    const { x, y: z } = aerator;
     const floor = substrateHeight(x, z);
-    this.source = new Vector2(x, z);
     this.origin = new Vector3(x, floor + 0.022, z);
 
     const stoneMaterial = new MeshStandardMaterial({ color: 0x8a8a86, roughness: 1 });

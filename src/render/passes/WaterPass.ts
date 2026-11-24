@@ -2,6 +2,7 @@ import { Matrix4, ShaderMaterial, Vector2, type DepthTexture, type PerspectiveCa
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { ROOM_PARS } from '../roomGlsl';
 import { FULLSCREEN_VERTEX, VIEW_RAY_GLSL, updateViewRayUniforms, viewRayUniforms } from '../waterGlsl';
+import { WAVES_GLSL } from '../wavesGlsl';
 import type { WaterLook } from '../../world/environment';
 
 const fragmentShader = /* glsl */ `
@@ -17,10 +18,12 @@ uniform float uRoomLod;
 uniform float uGlassEta;
 uniform float uTime;
 uniform vec2 uTexel;
+uniform vec3 uAgitation;
 varying vec2 vUv;
 
 ${VIEW_RAY_GLSL}
 ${ROOM_PARS}
+${WAVES_GLSL}
 
 // Ambient light scattered by the water itself: brighter towards the surface and the lamp.
 vec3 waterColor( vec3 dir, float y ) {
@@ -121,10 +124,8 @@ void main() {
   vec4 src = texture2D( tColor, vUv );
   float depth = texture2D( tDepth, vUv ).r;
   vec3 dir = viewRay( vUv );
-  // Alpha in [0, 1] is coverage over the alpha-0 clear (MSAA edges, fins, bubbles: rgb is premultiplied);
-  // the water surface writes 1 + F, its mirror reflectance.
-  float coverage = min( src.a, 1.0 );
-  float mirror = clamp( src.a - 1.0, 0.0, 1.0 );
+  // Alpha is coverage over the alpha-0 clear (MSAA edges, fins, bubbles: rgb is premultiplied).
+  float coverage = src.a;
   vec3 color = vec3( 0.0 );
   float dist;
 
@@ -140,11 +141,12 @@ void main() {
   } else {
     dist = length( viewPosition( vUv, depth ) );
     vec3 surface = src.rgb;
-    if ( mirror > 0.002 ) {
-      vec3 p = uCamPos + dir * dist;
-      vec2 w = vec2( sin( p.x * 41.0 + uTime * 1.3 ) + sin( p.z * 57.0 - uTime * 1.7 ), cos( p.z * 43.0 + uTime * 1.1 ) + sin( p.x * 31.0 + uTime ) );
-      vec3 n = normalize( vec3( w.x * 0.03, -1.0, w.y * 0.03 ) );
-      surface += traceReflection( p, reflect( dir, n ) ) * mirror;
+    vec3 p = uCamPos + dir * dist;
+    // The water surface is the flat plane at the water level; its waves live in the normals.
+    if ( abs( p.y - uBoxMax.y ) < 0.0008 ) {
+      vec3 n = waveNormal( p.xz, uTime, uAgitation );
+      float F = waterToAirFresnel( max( dot( dir, n ), 0.02 ) );
+      surface += traceReflection( p, reflect( dir, n ) ) * F * coverage;
     }
     vec3 T = exp( -uExtinction * dist );
     color += surface * T + waterColor( dir, uCamPos.y ) * ( 1.0 - T ) * coverage;
@@ -190,6 +192,7 @@ export class WaterPass {
         uGlassEta: { value: look.glassEta },
         uTime: { value: 0 },
         uTexel: { value: new Vector2() },
+        uAgitation: { value: look.surfaceAgitation },
       },
       vertexShader: FULLSCREEN_VERTEX,
       fragmentShader,

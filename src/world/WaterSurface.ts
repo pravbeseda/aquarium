@@ -1,19 +1,15 @@
-import { DoubleSide, Mesh, PlaneGeometry, ShaderMaterial, Vector2, Vector3, type Texture } from 'three';
+import { DoubleSide, Mesh, PlaneGeometry, ShaderMaterial, Vector2, type Texture } from 'three';
 import { ROOM_PARS } from '../render/roomGlsl';
+import { WAVES_GLSL } from '../render/wavesGlsl';
 import { TANK } from '../sim/tank';
 import type { WaterLook } from './environment';
 
+// The surface stays a flat plane, so the water pass can recognise it by height; the waves live in the normals.
 const vertexShader = /* glsl */ `
-uniform float uTime;
-uniform vec3 uAgitation;
 varying vec3 vWorld;
-
-WAVES
 
 void main() {
   vec4 world = modelMatrix * vec4( position, 1.0 );
-  vec2 grad;
-  world.y += waves( world.xz, uTime, grad );
   vWorld = world.xyz;
   gl_Position = projectionMatrix * viewMatrix * world;
 }
@@ -29,12 +25,10 @@ uniform vec3 uLampRadiance;
 varying vec3 vWorld;
 
 ${ROOM_PARS}
-WAVES
+${WAVES_GLSL}
 
 void main() {
-  vec2 grad;
-  waves( vWorld.xz, uTime, grad );
-  vec3 n = normalize( vec3( -grad.x, 1.0, -grad.y ) );
+  vec3 n = waveNormal( vWorld.xz, uTime, uAgitation );
   vec3 v = normalize( vWorld - cameraPosition );
   float cosI = max( dot( v, n ), 0.02 );
   float F = waterToAirFresnel( cosI );
@@ -52,47 +46,21 @@ void main() {
     air += uLampRadiance * emitter;
     air *= 1.0 - F;
   }
-  // Alpha above 1 carries the mirror fraction for the water pass, which traces the reflection.
-  gl_FragColor = vec4( air, 1.0 + F );
+  // The reflected part (F) is added by the water pass, which can trace the tank's mirror image.
+  gl_FragColor = vec4( air, 1.0 );
 }
 `;
 
-// Capillary-gravity wave trains plus ripples from the bubble column; returns height and its gradient.
-const WAVES = /* glsl */ `
-float waves( vec2 p, float t, out vec2 grad ) {
-  const vec2 dirs[ 7 ] = vec2[]( vec2( 1.0, 0.2 ), vec2( -0.6, 1.0 ), vec2( 0.8, -0.7 ), vec2( -1.0, -0.35 ), vec2( 0.25, 1.0 ), vec2( 0.7, 0.55 ), vec2( -0.3, -1.0 ) );
-  const float lens[ 7 ] = float[]( 0.23, 0.14, 0.09, 0.061, 0.038, 0.024, 0.016 );
-  float h = 0.0;
-  grad = vec2( 0.0 );
-  for ( int i = 0; i < 7; i++ ) {
-    vec2 d = normalize( dirs[ i ] );
-    float k = 6.2831853 / lens[ i ];
-    float w = sqrt( 9.81 * k + 7.4e-5 * k * k * k );
-    float a = lens[ i ] * 0.0075;
-    float ph = k * dot( d, p ) - w * t * 0.45 + float( i ) * 1.7;
-    h += a * sin( ph );
-    grad += a * k * d * cos( ph );
-  }
-  vec2 r = p - uAgitation.xy;
-  float rl = length( r ) + 1e-4;
-  float env = uAgitation.z * exp( -rl * 9.0 );
-  float ph = rl * 140.0 - t * 14.0;
-  h += env * sin( ph );
-  grad += env * ( 140.0 * cos( ph ) - 9.0 * sin( ph ) ) * ( r / rl );
-  return h;
-}
-`;
-
-export function createWaterSurface(look: WaterLook, room: { texture: Texture; maxLod: number }, agitation: Vector2): Mesh {
+export function createWaterSurface(look: WaterLook, room: { texture: Texture; maxLod: number }): Mesh {
   const width = TANK.max.x - TANK.min.x;
   const depth = TANK.max.z - TANK.min.z;
-  const geometry = new PlaneGeometry(width, depth, 96, 40);
+  const geometry = new PlaneGeometry(width, depth);
   geometry.rotateX(-Math.PI / 2);
 
   const material = new ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
-      uAgitation: { value: new Vector3(agitation.x, agitation.y, 0.0016) },
+      uAgitation: { value: look.surfaceAgitation },
       tRoom: { value: room.texture },
       uRoomRot: { value: look.roomRotation },
       uRoomCenter: { value: look.roomCenter },
@@ -103,8 +71,8 @@ export function createWaterSurface(look: WaterLook, room: { texture: Texture; ma
       uLampHalf: { value: new Vector2(...look.lamp.halfSize) },
       uLampRadiance: { value: look.lamp.radiance },
     },
-    vertexShader: vertexShader.replace('WAVES', WAVES),
-    fragmentShader: fragmentShader.replace('WAVES', WAVES),
+    vertexShader,
+    fragmentShader,
     side: DoubleSide,
   });
 
